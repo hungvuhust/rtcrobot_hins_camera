@@ -8,7 +8,7 @@ RtcrobotHinsCamera::RtcrobotHinsCamera()
     : LifecycleNode("rtcrobot_hins_camera") {}
 
 RtcrobotHinsCamera::~RtcrobotHinsCamera() {
-  RCLCPP_INFO(get_logger(), "Destroying");
+  RCLCPP_INFO(get_logger(), "Destructor");
   is_ready_.store(false);
   if (thread_epoll_.joinable()) {
     thread_epoll_.join();
@@ -169,7 +169,7 @@ void RtcrobotHinsCamera::threadEpoll() {
           std::cerr << "Invalid frame" << std::endl;
           continue;
         }
-        print_debug_recv(buffer, n);
+        // print_debug_recv(buffer, n);
         if (buffer[8] == uint8_t(Command::QUERY_RECOGNIZER)) {
           QueryRecognizer::Response resp(response);
           PoseStamped::SharedPtr    msg= std::make_shared<PoseStamped>();
@@ -177,6 +177,8 @@ void RtcrobotHinsCamera::threadEpoll() {
           msg->header.stamp= now();
 
           if (resp.isValid) {
+
+            msg->header.frame_id= resp.id;
             msg->pose.position.x= resp.x;
             msg->pose.position.y= resp.y;
             msg->pose.position.z= 0.0;
@@ -212,14 +214,18 @@ void RtcrobotHinsCamera::threadEpoll() {
 
 void RtcrobotHinsCamera::threadPublisher() {
   while (is_ready_) {
-    socket_->send(
-        QueryRecognizer::Request(QueryRecognizer::MethodREQUEST::QUERY_AUTO)
-            .getFrame());
-    auto msg= *dm_code_.load(std::memory_order_relaxed)
-                   .get(); // get the latest dm_code
-    publisher_dm_code_->publish(msg);
+    if (!socket_->send(
+            QueryRecognizer::Request(QueryRecognizer::MethodREQUEST::QUERY_AUTO)
+                .getFrame())) {
+      RCLCPP_ERROR(get_logger(), "Failed to send query recognizer");
+    }
+    auto msg=
+        dm_code_.load(std::memory_order_relaxed); // get the latest dm_code
+    if (msg) {
+      publisher_dm_code_->publish(*msg);
+    }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
 }
 
