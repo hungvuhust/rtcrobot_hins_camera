@@ -1,5 +1,5 @@
 #include "rtcrobot_hins_camera/rtcrobot_hins_camera.hpp"
-
+#include <sstream>
 namespace rtcrobot_hins_camera {
 
 using namespace hinson_protocol;
@@ -177,8 +177,10 @@ void RtcrobotHinsCamera::threadEpoll() {
           msg->header.stamp= now();
 
           if (resp.isValid) {
+            std::stringstream ss;
+            ss << resp.id;
 
-            msg->header.frame_id= resp.id;
+            msg->header.frame_id= ss.str();
             msg->pose.position.x= resp.x;
             msg->pose.position.y= resp.y;
             msg->pose.position.z= 0.0;
