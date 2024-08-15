@@ -13,10 +13,19 @@ def generate_launch_description():
     hins_camera_node = Node(
         package='rtcrobot_hins_camera',
         executable='hins_camera_node',
+        name='hins_camera_node',
         parameters=[param_file],
         output='screen'
     )
 
-    
+    nav2_life_cycle_manager = Node(
+        package='nav2_lifecycle_manager',
+        executable='lifecycle_manager',
+        name='lifecycle_manager',
+        output='screen',
+        parameters=[{'use_sim_time': False},
+                    {'autostart': True},
+                    {'node_names': ['hins_camera_node']}]
+    )
 
-    return LaunchDescription([hins_camera_node])
+    return LaunchDescription([hins_camera_node, nav2_life_cycle_manager])

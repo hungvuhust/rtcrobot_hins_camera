@@ -44,7 +44,8 @@ rtcrobot_navutil::CallbackReturn
   thread_epoll_    = std::thread(&RtcrobotHinsCamera::threadEpoll, this);
   thread_publisher_= std::thread(&RtcrobotHinsCamera::threadPublisher, this);
   RCLCPP_INFO(get_logger(), "Activated");
-
+  // create bond connection
+  createBond();
   return rtcrobot_navutil::CallbackReturn::SUCCESS;
 }
 
@@ -60,6 +61,7 @@ rtcrobot_navutil::CallbackReturn
   if (thread_publisher_.joinable()) {
     thread_publisher_.join();
   }
+  destroyBond();
   return rtcrobot_navutil::CallbackReturn::SUCCESS;
 }
 
