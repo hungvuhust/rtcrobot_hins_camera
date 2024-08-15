@@ -1,0 +1,11 @@
+rtcrobot_hins_camera:
+  ros__parameters:
+    address: "192.168.1.88"
+    port: 8888
+    # param
+    gain: 246
+    exposure: 33
+    pwm: 50
+    corrosion: 1
+    # length
+    length: 107
