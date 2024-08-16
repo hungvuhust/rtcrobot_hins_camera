@@ -165,26 +165,31 @@ void RtcrobotHinsCamera::changeParamCallback(
                          request->corrosion)
                          .getFrame())) {
     RCLCPP_ERROR(get_logger(), "Cann't send socket to change parameter");
-    response->status= false;
+    response->status = false;
+    response->message= "ERROR SOCKET SEND";
     return;
   }
   flag_change_param_.store(0);
   auto start_time= std::chrono::high_resolution_clock::now();
+  RCLCPP_INFO(get_logger(), "Wait for response");
   while (std::chrono::high_resolution_clock::now() - start_time <
          std::chrono::seconds(2)) {
-    RCLCPP_INFO(get_logger(), "Wait for response");
     if (flag_change_param_.load() == 1) {
-      response->status= true;
+      response->status = true;
+      response->message= "SUCCESS";
       RCLCPP_INFO(get_logger(), "Change parameter success");
       return;
     } else if (flag_change_param_.load() == -1) {
-      response->status= false;
+      response->status = false;
+      response->message= "FAILED";
       RCLCPP_ERROR(get_logger(), "Change parameter failed");
       return;
     }
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
   RCLCPP_ERROR(get_logger(), "Change parameter timeout");
-  response->status= false;
+  response->status = false;
+  response->message= "TIMEOUT";
   return;
 }
 
@@ -195,21 +200,23 @@ void RtcrobotHinsCamera::readParamCallback(
 
   if (!socket_->send(ReadParameter::Request().getFrame())) {
     RCLCPP_ERROR(get_logger(), "Cann't send socket to read parameter");
-    response->status= false;
+    response->status = false;
+    response->message= "ERROR SOCKET SEND";
     return;
   }
 
   flag_read_param_.store(0);
   auto start_time= std::chrono::high_resolution_clock::now();
+  RCLCPP_INFO(get_logger(), "Wait for response");
   while (std::chrono::high_resolution_clock::now() - start_time <
          std::chrono::seconds(2)) {
-    RCLCPP_INFO(get_logger(), "Wait for response");
     if (flag_read_param_.load() == 1) {
       response->gain     = gain_;
       response->exposure = exposure_;
       response->pwm      = pwm_;
       response->corrosion= corrosion_;
       response->status   = true;
+      response->message  = "SUCCESS";
       RCLCPP_INFO_STREAM(
           get_logger(), "Read parameter: "
                             << "Gain: " << response->gain << " Exposure: "
@@ -218,12 +225,15 @@ void RtcrobotHinsCamera::readParamCallback(
       return;
     } else if (flag_read_param_.load() == -1) {
       RCLCPP_ERROR(get_logger(), "Read parameter failed");
-      response->status= false;
+      response->status = false;
+      response->message= "FAILED";
       return;
     }
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
   RCLCPP_ERROR(get_logger(), "Read parameter timeout");
-  response->status= false;
+  response->status = false;
+  response->message= "TIMEOUT";
   return;
 }
 
@@ -234,30 +244,35 @@ void RtcrobotHinsCamera::changeCodeLengthCallback(
   if (!socket_->send(
           SetCodeLength::Request(uint16_t(request->length)).getFrame())) {
     RCLCPP_ERROR(get_logger(), "Cann't send socket change code length");
-    response->status= false;
+    response->status = false;
+    response->message= "ERROR SOCKET SEND";
     return;
   }
   flag_change_code_length_.store(0);
   auto start_time= std::chrono::high_resolution_clock::now();
+  RCLCPP_INFO(get_logger(), "Wait for response ...");
   while (std::chrono::high_resolution_clock::now() - start_time <
          std::chrono::seconds(2)) {
-    RCLCPP_INFO(get_logger(), "Wait for response ...");
     if (flag_change_code_length_.load() == 1) {
-      response->status= true;
+      response->status = true;
+      response->message= "SUCCESS";
       RCLCPP_INFO_STREAM(
           get_logger(),
           "Change length code to " << request->length << " success!");
       return;
     } else if (flag_change_code_length_.load() == -1) {
-      response->status= false;
+      response->status = false;
+      response->message= "FAILED";
       RCLCPP_ERROR_STREAM(
           get_logger(),
           "Change length code to " << request->length << " failed!");
       return;
     }
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
   RCLCPP_ERROR(get_logger(), "Change code length timeout!");
-  response->status= false;
+  response->status = false;
+  response->message= "TIMEOUT";
   return;
 }
 
@@ -268,30 +283,38 @@ void RtcrobotHinsCamera::changeCodeTypeCallback(
   if (!socket_->send(
           SetCodeLength::Request(uint16_t(request->type)).getFrame())) {
     RCLCPP_ERROR(get_logger(), "Cann't send socket change code type");
-    response->status= false;
+    response->status = false;
+    response->message= "ERROR SOCKET SEND";
     return;
   }
   flag_change_code_type_.store(0);
   auto start_time= std::chrono::high_resolution_clock::now();
+  RCLCPP_INFO(get_logger(), "Wait for response ...");
   while (std::chrono::high_resolution_clock::now() - start_time <
          std::chrono::seconds(2)) {
-    RCLCPP_INFO(get_logger(), "Wait for response ...");
     if (flag_change_code_type_.load() == 1) {
-      response->status= true;
+      response->status = true;
+      response->message= "SUCCESS";
+
       RCLCPP_INFO_STREAM(
           get_logger(),
           "Change length code to " << request->type << " success!");
       return;
     } else if (flag_change_code_type_.load() == -1) {
-      response->status= false;
+      response->status = false;
+      response->message= "FAILED";
+
       RCLCPP_ERROR_STREAM(
           get_logger(),
           "Change length code to " << request->type << " failed!");
       return;
     }
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
   RCLCPP_ERROR(get_logger(), "Change code type timeout!");
-  response->status= false;
+  response->status = false;
+  response->message= "TIMEOUT";
+
   return;
 }
 
