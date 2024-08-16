@@ -45,36 +45,38 @@ public:
   };
 
   struct Response {
-    uint16_t protocol_version{0x0000};
+    uint16_t protocol_version{uint8_t(Command::QUERY_IMAGE)};
     uint8_t  command{uint8_t(Command::QUERY_IMAGE)};
     uint8_t  method{0x00};
 
     std::vector<uint8_t> frame;
-    std::string          map;
-    bool                 isValid{false};
+    std::string          mat;
+    std::string          id;
+    float                x{0}, y{0}, theta{0};
 
-    Response(std::vector<uint8_t> &response) : frame(response) {
-      //   if (response[0] != 0x74 or re)
-      json j= json::parse(frame);
-      // check if j have "map"
-      if (j.find("map") != j.end()) {
-        map    = j["map"];
-        isValid= true;
-      } else {
-        isValid= false;
-      }
-    }
+    bool isValid{false};
+
     Response(uint8_t *buffer, ssize_t n) {
-      frame.clear();
-      frame.insert(frame.end(), buffer, buffer + n);
       json j= json::parse(buffer);
-      // check if j have "map"
-      if (j.find("map") != j.end()) {
-        map    = j["map"];
-        isValid= true;
-      } else {
+      // check if j have "mat"
+
+      mat    = j["mat"].dump().c_str();
+      id     = j["dmID"].dump().c_str();
+      int ret= sscanf((j["camLocate"]).dump().c_str(), "\"%f,%f\"", &x, &y);
+      if (ret != 2) {
         isValid= false;
+        return;
       }
+      x*= 0.0001;
+      y*= 0.0001;
+
+      ret= sscanf((j["angle"]).dump().c_str(), "\"%f\"", &theta);
+      if (ret != 1) {
+        isValid= false;
+        return;
+      }
+      theta*= 0.1;
+      isValid= true;
     }
   };
 };

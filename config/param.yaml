@@ -1,4 +1,4 @@
-rtcrobot_hins_camera:
+hins_camera_node:
   ros__parameters:
     address: "192.168.1.88"
     port: 8888
@@ -9,3 +9,5 @@ rtcrobot_hins_camera:
     corrosion: 1
     # length
     length: 107
+    # type
+    type: 0x0100

@@ -22,10 +22,12 @@
 #include <chrono>
 #include <iostream>
 #include <memory>
+#include <mutex>
 #include <thread>
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
-
+#include "std_msgs/msg/string.hpp"
+#include "std_srvs/srv/trigger.hpp"
 namespace rtcrobot_hins_camera {
 
 using PoseStamped          = geometry_msgs::msg::PoseStamped;
@@ -33,7 +35,8 @@ using ReadParamCameraHins  = rtcrobot_interfaces::srv::ReadParamCameraHins;
 using ChangeParamCameraHins= rtcrobot_interfaces::srv::ChangeParamCameraHins;
 using ChangeCodeLength     = rtcrobot_interfaces::srv::ChangeCodeLength;
 using ChangeCodeType       = rtcrobot_interfaces::srv::ChangeCodeType;
-
+using String               = std_msgs::msg::String;
+using Trigger              = std_srvs::srv::Trigger;
 class RtcrobotHinsCamera : public rtcrobot_navutil::LifecycleNode {
 private:
   std::shared_ptr<SocketUDP> socket_;
@@ -45,7 +48,8 @@ private:
 
   // publisher
   rclcpp_lifecycle::LifecyclePublisher<PoseStamped>::SharedPtr
-      publisher_dm_code_;
+                                                          publisher_dm_code_;
+  rclcpp_lifecycle::LifecyclePublisher<String>::SharedPtr publisher_images_;
   // subscriber
 
   // service
@@ -53,6 +57,8 @@ private:
   rclcpp::Service<ReadParamCameraHins>::SharedPtr   read_parameter_service_;
   rclcpp::Service<ChangeCodeLength>::SharedPtr      change_code_length_service_;
   rclcpp::Service<ChangeCodeType>::SharedPtr        change_code_type_service_;
+  rclcpp::Service<Trigger>::SharedPtr               pub_images_service_;
+  rclcpp::Service<Trigger>::SharedPtr               unpub_images_service_;
 
   // excutor_thead
   rclcpp::CallbackGroup::SharedPtr                     callback_group_;
@@ -60,14 +66,18 @@ private:
   std::unique_ptr<rtcrobot_navutil::NodeThread>        excutor_thread_;
 
   // atomic
-  std::atomic<bool>                   is_ready_{false};
+  std::atomic<bool>                   is_ready_{false}, is_pub_images_{false};
   std::atomic<PoseStamped::SharedPtr> dm_code_;
+  std::atomic<String::SharedPtr>      images_;
   std::atomic<int> flag_read_param_{0}, flag_change_param_{0},
       flag_change_code_length_{0}, flag_change_code_type_{0};
 
   // thread
   std::thread thread_epoll_;
-  std::thread thread_publisher_;
+  std::thread thread_publisher_images_;
+
+  // mutex
+  std::mutex mutex_socket_;
 
 public:
   explicit RtcrobotHinsCamera();
@@ -96,7 +106,7 @@ protected:
 
 private:
   void threadEpoll();
-  void threadPublisher();
+  void threadPublisherImages();
 
 private:
   void changeParamCallback(
@@ -114,6 +124,14 @@ private:
   void changeCodeTypeCallback(
       const std::shared_ptr<ChangeCodeType::Request> request,
       std::shared_ptr<ChangeCodeType::Response>      response);
+
+  void pubImagesCallback(
+      const std::shared_ptr<Trigger::Request> request,
+      std::shared_ptr<Trigger::Response>      response);
+
+  void unpubImagesCallback(
+      const std::shared_ptr<Trigger::Request> request,
+      std::shared_ptr<Trigger::Response>      response);
 };
 
 } // namespace rtcrobot_hins_camera

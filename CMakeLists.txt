@@ -11,6 +11,7 @@ set(dependencies
   ament_cmake
   rclcpp
   std_msgs
+  std_srvs
   tf2
   tf2_ros
   geometry_msgs
