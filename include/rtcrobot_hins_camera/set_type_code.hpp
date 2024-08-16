@@ -14,7 +14,6 @@ class SetTypeCode {
   enum class TYPE : uint16_t {
     DM10X10= 0x0000,
     DM12X12= 0x0100,
-
   };
 
 public:
@@ -57,7 +56,7 @@ public:
     uint8_t  command{uint8_t(Command::SET_TYPE_CODE)};
 
     bool isValid;
-    Response(std::vector<uint8_t> &response, uint16_t type) {
+    Response(std::vector<uint8_t> &response) {
       if ((uint16_t(response[6]) << 8 | response[7]) != protocol_version) {
         isValid= false;
         std::cerr << "Invalid protocol version" << std::endl;
@@ -70,7 +69,7 @@ public:
         return;
       }
 
-      if (uint16_t(response[10] << 8 | response[9]) != 0x00) {
+      if (uint16_t(response[10] << 8 | response[9]) != 0x0000) {
         std::cerr << "ChangeParameter response: Failed" << std::endl;
         isValid= false;
         return;

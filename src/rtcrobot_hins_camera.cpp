@@ -98,17 +98,17 @@ rtcrobot_navutil::CallbackReturn
 void RtcrobotHinsCamera::initParameters() {
   get_parameter("address", address_);
   get_parameter("port", port_);
-  get_parameter("gain", gain);
-  get_parameter("exposure", exposure);
-  get_parameter("pwm", pwm);
-  get_parameter("corrosion", corrosion);
+  get_parameter("gain", gain_);
+  get_parameter("exposure", exposure_);
+  get_parameter("pwm", pwm_);
+  get_parameter("corrosion", corrosion_);
 
   RCLCPP_INFO_STREAM(get_logger(), "address: " << address_.c_str());
   RCLCPP_INFO_STREAM(get_logger(), "port: " << port_);
-  RCLCPP_INFO_STREAM(get_logger(), "gain: " << gain);
-  RCLCPP_INFO_STREAM(get_logger(), "exposure: " << exposure);
-  RCLCPP_INFO_STREAM(get_logger(), "pwm: " << pwm);
-  RCLCPP_INFO_STREAM(get_logger(), "corrosion: " << corrosion);
+  RCLCPP_INFO_STREAM(get_logger(), "gain: " << gain_);
+  RCLCPP_INFO_STREAM(get_logger(), "exposure: " << exposure_);
+  RCLCPP_INFO_STREAM(get_logger(), "pwm: " << pwm_);
+  RCLCPP_INFO_STREAM(get_logger(), "corrosion: " << corrosion_);
 }
 
 void RtcrobotHinsCamera::initNetwork() {
@@ -130,6 +130,20 @@ void RtcrobotHinsCamera::initService() {
           &RtcrobotHinsCamera::readParamCallback, this, std::placeholders::_1,
           std::placeholders::_2),
       rmw_qos_profile_services_default, callback_group_);
+
+  change_code_length_service_= create_service<ChangeCodeLength>(
+      "/change_code_length",
+      std::bind(
+          &RtcrobotHinsCamera::changeCodeLengthCallback, this,
+          std::placeholders::_1, std::placeholders::_2),
+      rmw_qos_profile_services_default, callback_group_);
+
+  change_code_type_service_= create_service<ChangeCodeType>(
+      "/change_code_type",
+      std::bind(
+          &RtcrobotHinsCamera::changeCodeTypeCallback, this,
+          std::placeholders::_1, std::placeholders::_2),
+      rmw_qos_profile_services_default, callback_group_);
 }
 
 void RtcrobotHinsCamera::initPubSub() {
@@ -141,13 +155,144 @@ void RtcrobotHinsCamera::initPubSub() {
 void RtcrobotHinsCamera::changeParamCallback(
     const std::shared_ptr<ChangeParamCameraHins::Request> request,
     std::shared_ptr<ChangeParamCameraHins::Response>      response) {
-  RCLCPP_INFO(get_logger(), "Change parameter");
+  RCLCPP_INFO_STREAM(
+      get_logger(), "Change parameter: "
+                        << "Gain: " << request->gain << " Exposure: "
+                        << request->exposure << " PWM: " << request->pwm
+                        << " Corrosion: " << request->corrosion);
+  if (!socket_->send(ChangeParameter::Request(
+                         request->gain, request->exposure, request->pwm,
+                         request->corrosion)
+                         .getFrame())) {
+    RCLCPP_ERROR(get_logger(), "Cann't send socket to change parameter");
+    response->status= false;
+    return;
+  }
+  flag_change_param_.store(0);
+  auto start_time= std::chrono::high_resolution_clock::now();
+  while (std::chrono::high_resolution_clock::now() - start_time <
+         std::chrono::seconds(2)) {
+    RCLCPP_INFO(get_logger(), "Wait for response");
+    if (flag_change_param_.load() == 1) {
+      response->status= true;
+      RCLCPP_INFO(get_logger(), "Change parameter success");
+      return;
+    } else if (flag_change_param_.load() == -1) {
+      response->status= false;
+      RCLCPP_ERROR(get_logger(), "Change parameter failed");
+      return;
+    }
+  }
+  RCLCPP_ERROR(get_logger(), "Change parameter timeout");
+  response->status= false;
+  return;
 }
 
 void RtcrobotHinsCamera::readParamCallback(
     const std::shared_ptr<ReadParamCameraHins::Request> request,
     std::shared_ptr<ReadParamCameraHins::Response>      response) {
   RCLCPP_INFO(get_logger(), "Read parameter");
+
+  if (!socket_->send(ReadParameter::Request().getFrame())) {
+    RCLCPP_ERROR(get_logger(), "Cann't send socket to read parameter");
+    response->status= false;
+    return;
+  }
+
+  flag_read_param_.store(0);
+  auto start_time= std::chrono::high_resolution_clock::now();
+  while (std::chrono::high_resolution_clock::now() - start_time <
+         std::chrono::seconds(2)) {
+    RCLCPP_INFO(get_logger(), "Wait for response");
+    if (flag_read_param_.load() == 1) {
+      response->gain     = gain_;
+      response->exposure = exposure_;
+      response->pwm      = pwm_;
+      response->corrosion= corrosion_;
+      response->status   = true;
+      RCLCPP_INFO_STREAM(
+          get_logger(), "Read parameter: "
+                            << "Gain: " << response->gain << " Exposure: "
+                            << response->exposure << " PWM: " << response->pwm
+                            << " Corrosion: " << response->corrosion);
+      return;
+    } else if (flag_read_param_.load() == -1) {
+      RCLCPP_ERROR(get_logger(), "Read parameter failed");
+      response->status= false;
+      return;
+    }
+  }
+  RCLCPP_ERROR(get_logger(), "Read parameter timeout");
+  response->status= false;
+  return;
+}
+
+void RtcrobotHinsCamera::changeCodeLengthCallback(
+    const std::shared_ptr<ChangeCodeLength::Request> request,
+    std::shared_ptr<ChangeCodeLength::Response>      response) {
+  RCLCPP_INFO(get_logger(), "Change Code Lenght");
+  if (!socket_->send(
+          SetCodeLength::Request(uint16_t(request->length)).getFrame())) {
+    RCLCPP_ERROR(get_logger(), "Cann't send socket change code length");
+    response->status= false;
+    return;
+  }
+  flag_change_code_length_.store(0);
+  auto start_time= std::chrono::high_resolution_clock::now();
+  while (std::chrono::high_resolution_clock::now() - start_time <
+         std::chrono::seconds(2)) {
+    RCLCPP_INFO(get_logger(), "Wait for response ...");
+    if (flag_change_code_length_.load() == 1) {
+      response->status= true;
+      RCLCPP_INFO_STREAM(
+          get_logger(),
+          "Change length code to " << request->length << " success!");
+      return;
+    } else if (flag_change_code_length_.load() == -1) {
+      response->status= false;
+      RCLCPP_ERROR_STREAM(
+          get_logger(),
+          "Change length code to " << request->length << " failed!");
+      return;
+    }
+  }
+  RCLCPP_ERROR(get_logger(), "Change code length timeout!");
+  response->status= false;
+  return;
+}
+
+void RtcrobotHinsCamera::changeCodeTypeCallback(
+    const std::shared_ptr<ChangeCodeType::Request> request,
+    std::shared_ptr<ChangeCodeType::Response>      response) {
+  RCLCPP_INFO_STREAM(get_logger(), "Change Code Type: " << (request->type));
+  if (!socket_->send(
+          SetCodeLength::Request(uint16_t(request->type)).getFrame())) {
+    RCLCPP_ERROR(get_logger(), "Cann't send socket change code type");
+    response->status= false;
+    return;
+  }
+  flag_change_code_type_.store(0);
+  auto start_time= std::chrono::high_resolution_clock::now();
+  while (std::chrono::high_resolution_clock::now() - start_time <
+         std::chrono::seconds(2)) {
+    RCLCPP_INFO(get_logger(), "Wait for response ...");
+    if (flag_change_code_type_.load() == 1) {
+      response->status= true;
+      RCLCPP_INFO_STREAM(
+          get_logger(),
+          "Change length code to " << request->type << " success!");
+      return;
+    } else if (flag_change_code_type_.load() == -1) {
+      response->status= false;
+      RCLCPP_ERROR_STREAM(
+          get_logger(),
+          "Change length code to " << request->type << " failed!");
+      return;
+    }
+  }
+  RCLCPP_ERROR(get_logger(), "Change code type timeout!");
+  response->status= false;
+  return;
 }
 
 void RtcrobotHinsCamera::threadEpoll() {
@@ -202,13 +347,48 @@ void RtcrobotHinsCamera::threadEpoll() {
           continue;
         } else if (buffer[8] == uint8_t(Command::READ_PARAMETER)) {
           ReadParameter::Response resp(response);
-
+          if (resp.isValid) {
+            gain_     = resp.gain;
+            exposure_ = resp.exposure;
+            pwm_      = resp.pwm;
+            corrosion_= resp.corrosion;
+            flag_read_param_.store(1);
+          } else {
+            RCLCPP_ERROR(this->get_logger(), "Read Parameter Failed!");
+            flag_read_param_.store(-1);
+          }
           continue;
         } else if (buffer[8] == uint8_t(Command::CHANGE_PARAMETER)) {
           ChangeParameter::Response resp(response);
+          if (resp.isValid) {
+            RCLCPP_INFO(get_logger(), "Change Parameter Success");
+            flag_change_param_.store(1);
+          } else {
+            RCLCPP_ERROR(get_logger(), "Change Parameter Failed!");
+            flag_change_param_.store(-1);
+          }
           continue;
         } else if (buffer[8] == uint8_t(Command::SET_CODE_LENGTH)) {
           SetCodeLength::Response resp(response);
+          if (resp.isValid) {
+            RCLCPP_INFO(get_logger(), "Set Length Success");
+            flag_change_code_length_.store(1);
+          } else {
+            RCLCPP_ERROR(get_logger(), "Set Length Failed!");
+            flag_change_code_length_.store(-1);
+          }
+          continue;
+        } else if (buffer[8] == uint8_t(Command::SET_TYPE_CODE)) {
+          SetTypeCode::Response resp(response);
+          if (resp.isValid) {
+            if (resp.isValid) {
+              RCLCPP_INFO(get_logger(), "Set Code Type Success");
+              flag_change_code_type_.store(1);
+            } else {
+              RCLCPP_ERROR(get_logger(), "Change Code Type Failed!");
+              flag_change_code_type_.store(-1);
+            }
+          }
           continue;
         }
       }

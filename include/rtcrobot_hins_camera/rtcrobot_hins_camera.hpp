@@ -8,9 +8,12 @@
 #include "query_recognizer.hpp"
 #include "read_parameter.hpp"
 #include "set_code_length.hpp"
+#include "set_type_code.hpp"
 #include "socket_udp.hpp"
 
 #include "rclcpp/rclcpp.hpp"
+#include "rtcrobot_interfaces/srv/change_code_length.hpp"
+#include "rtcrobot_interfaces/srv/change_code_type.hpp"
 #include "rtcrobot_interfaces/srv/change_param_camera_hins.hpp"
 #include "rtcrobot_interfaces/srv/read_param_camera_hins.hpp"
 #include "rtcrobot_navutil/lifecycle_node.hpp"
@@ -28,6 +31,8 @@ namespace rtcrobot_hins_camera {
 using PoseStamped          = geometry_msgs::msg::PoseStamped;
 using ReadParamCameraHins  = rtcrobot_interfaces::srv::ReadParamCameraHins;
 using ChangeParamCameraHins= rtcrobot_interfaces::srv::ChangeParamCameraHins;
+using ChangeCodeLength     = rtcrobot_interfaces::srv::ChangeCodeLength;
+using ChangeCodeType       = rtcrobot_interfaces::srv::ChangeCodeType;
 
 class RtcrobotHinsCamera : public rtcrobot_navutil::LifecycleNode {
 private:
@@ -36,7 +41,7 @@ private:
 
   //   param socketUDP
   std::string address_{"192.168.1.88"};
-  int         port_{8888}, gain{246}, exposure{33}, pwm{80}, corrosion{1};
+  int         port_{8888}, gain_{246}, exposure_{33}, pwm_{80}, corrosion_{1};
 
   // publisher
   rclcpp_lifecycle::LifecyclePublisher<PoseStamped>::SharedPtr
@@ -46,6 +51,8 @@ private:
   // service
   rclcpp::Service<ChangeParamCameraHins>::SharedPtr change_parameter_service_;
   rclcpp::Service<ReadParamCameraHins>::SharedPtr   read_parameter_service_;
+  rclcpp::Service<ChangeCodeLength>::SharedPtr      change_code_length_service_;
+  rclcpp::Service<ChangeCodeType>::SharedPtr        change_code_type_service_;
 
   // excutor_thead
   rclcpp::CallbackGroup::SharedPtr                     callback_group_;
@@ -55,6 +62,8 @@ private:
   // atomic
   std::atomic<bool>                   is_ready_{false};
   std::atomic<PoseStamped::SharedPtr> dm_code_;
+  std::atomic<int> flag_read_param_{0}, flag_change_param_{0},
+      flag_change_code_length_{0}, flag_change_code_type_{0};
 
   // thread
   std::thread thread_epoll_;
@@ -97,6 +106,14 @@ private:
   void readParamCallback(
       const std::shared_ptr<ReadParamCameraHins::Request> request,
       std::shared_ptr<ReadParamCameraHins::Response>      response);
+
+  void changeCodeLengthCallback(
+      const std::shared_ptr<ChangeCodeLength::Request> request,
+      std::shared_ptr<ChangeCodeLength::Response>      response);
+
+  void changeCodeTypeCallback(
+      const std::shared_ptr<ChangeCodeType::Request> request,
+      std::shared_ptr<ChangeCodeType::Response>      response);
 };
 
 } // namespace rtcrobot_hins_camera
