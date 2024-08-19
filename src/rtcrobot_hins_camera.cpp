@@ -420,13 +420,15 @@ void RtcrobotHinsCamera::threadEpoll() {
           // query image
           try {
             QueryImage::Response resp(buffer, n);
+            auto                 msg= std::make_shared<String>();
             if (resp.isMatValid) {
-              auto msg = std::make_shared<String>();
               msg->data= resp.mat;
-              images_.store(msg, std::memory_order_relaxed);
             }
+            images_.store(msg, std::memory_order_relaxed);
+
+            auto msg_pose= std::make_shared<PoseStamped>();
+
             if (resp.isPoseValid) {
-              auto msg_pose            = std::make_shared<PoseStamped>();
               msg_pose->header.stamp   = now();
               msg_pose->header.frame_id= resp.id;
               msg_pose->pose.position.x= resp.x;
@@ -443,13 +445,14 @@ void RtcrobotHinsCamera::threadEpoll() {
               msg_pose->pose.orientation.y= q.y();
               msg_pose->pose.orientation.z= q.z();
               msg_pose->pose.orientation.w= q.w();
-
-              dm_code_.store(msg_pose, std::memory_order_relaxed);
             }
+            dm_code_.store(msg_pose, std::memory_order_relaxed);
+
           } catch (nlohmann::json::parse_error &e) {
             RCLCPP_ERROR(get_logger(), "Parse error: %s", e.what());
             continue;
           }
+
           continue;
         }
 
