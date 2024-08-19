@@ -66,11 +66,12 @@ private:
   std::unique_ptr<rtcrobot_navutil::NodeThread>        excutor_thread_;
 
   // atomic
-  std::atomic<bool>                   is_ready_{false}, is_pub_images_{false};
+  std::atomic<bool>                   is_ready_{false};
   std::atomic<PoseStamped::SharedPtr> dm_code_;
   std::atomic<String::SharedPtr>      images_;
   std::atomic<int> flag_read_param_{0}, flag_change_param_{0},
-      flag_change_code_length_{0}, flag_change_code_type_{0};
+      flag_change_code_length_{0}, flag_change_code_type_{0},
+      flag_pub_images_{-1};
 
   // thread
   std::thread thread_epoll_;

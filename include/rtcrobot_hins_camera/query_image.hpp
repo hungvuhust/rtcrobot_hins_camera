@@ -54,17 +54,21 @@ public:
     std::string          id;
     float                x{0}, y{0}, theta{0};
 
-    bool isValid{false};
+    bool isPoseValid{false}, isMatValid{false};
 
     Response(uint8_t *buffer, ssize_t n) {
       json j= json::parse(buffer);
       // check if j have "mat"
-
-      mat    = j["mat"].dump().c_str();
-      id     = j["dmID"].dump().c_str();
-      int ret= sscanf((j["camLocate"]).dump().c_str(), "\"%f,%f\"", &x, &y);
+      if (j.find("mat") == j.end()) {
+        isMatValid= false;
+        return;
+      }
+      isMatValid= true;
+      mat       = j["mat"].dump().c_str();
+      id        = j["dmID"].dump().c_str();
+      int ret   = sscanf((j["camLocate"]).dump().c_str(), "\"%f,%f\"", &x, &y);
       if (ret != 2) {
-        isValid= false;
+        isPoseValid= false;
         return;
       }
       x*= 0.0001;
@@ -72,11 +76,11 @@ public:
 
       ret= sscanf((j["angle"]).dump().c_str(), "\"%f\"", &theta);
       if (ret != 1) {
-        isValid= false;
+        isPoseValid= false;
         return;
       }
       theta*= 0.1;
-      isValid= true;
+      isPoseValid= true;
     }
   };
 };

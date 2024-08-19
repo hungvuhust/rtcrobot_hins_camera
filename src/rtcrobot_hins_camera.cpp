@@ -356,6 +356,7 @@ void RtcrobotHinsCamera::pubImagesCallback(
     const std::shared_ptr<Trigger::Request> request,
     std::shared_ptr<Trigger::Response>      response) {
   RCLCPP_INFO(get_logger(), "pub images");
+  flag_pub_images_.store(0);
   if (!socket_->send(
           QueryRecognizer::Request(QueryRecognizer::MethodREQUEST::STOP)
               .getFrame())) {
@@ -380,10 +381,8 @@ void RtcrobotHinsCamera::pubImagesCallback(
   if (!socket_->send(QueryImage::Request().getFrame())) {
     RCLCPP_ERROR(get_logger(), "Failed to send query images");
   }
-  is_pub_images_.store(true);
-
-  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-  if (!is_pub_images_.load()) {
+  flag_pub_images_.store(1);
+  if (flag_pub_images_.load() != 1) {
     RCLCPP_ERROR(get_logger(), "pub images failed");
     response->success= false;
     response->message= "FAILED";
@@ -395,8 +394,8 @@ void RtcrobotHinsCamera::pubImagesCallback(
 void RtcrobotHinsCamera::unpubImagesCallback(
     const std::shared_ptr<Trigger::Request> request,
     std::shared_ptr<Trigger::Response>      response) {
-  is_pub_images_.store(false);
-  if (!is_pub_images_.load()) {
+  flag_pub_images_.store(-1);
+  if (flag_pub_images_.load() == -1) {
     RCLCPP_INFO(get_logger(), "unpub images");
   } else {
     RCLCPP_ERROR(get_logger(), "unpub images failed");
@@ -421,11 +420,12 @@ void RtcrobotHinsCamera::threadEpoll() {
           // query image
           try {
             QueryImage::Response resp(buffer, n);
-            if (resp.isValid) {
+            if (resp.isMatValid) {
               auto msg = std::make_shared<String>();
               msg->data= resp.mat;
               images_.store(msg, std::memory_order_relaxed);
-
+            }
+            if (resp.isPoseValid) {
               auto msg_pose            = std::make_shared<PoseStamped>();
               msg_pose->header.stamp   = now();
               msg_pose->header.frame_id= resp.id;
@@ -539,7 +539,7 @@ void RtcrobotHinsCamera::threadEpoll() {
 
 void RtcrobotHinsCamera::threadPublisherImages() {
   while (is_ready_) {
-    if (is_pub_images_.load()) {
+    if (flag_pub_images_.load() == 1) {
       if (!socket_->send(QueryImage::Request().getFrame())) {
         RCLCPP_ERROR(get_logger(), "Failed to send query images");
       }
@@ -548,12 +548,15 @@ void RtcrobotHinsCamera::threadPublisherImages() {
       if (msg_images) {
         publisher_images_->publish(*msg_images);
       }
-    } else {
+    } else if (flag_pub_images_.load() == -1) {
       if (!socket_->send(QueryRecognizer::Request(
                              QueryRecognizer::MethodREQUEST::QUERY_AUTO)
                              .getFrame())) {
         RCLCPP_ERROR(get_logger(), "Failed to send query recognizer");
       }
+    } else {
+      std::this_thread::sleep_for(std::chrono::milliseconds(500));
+      continue;
     }
     auto msg=
         dm_code_.load(std::memory_order_relaxed); // get the latest dm_code
